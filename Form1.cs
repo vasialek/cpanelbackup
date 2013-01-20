@@ -18,6 +18,8 @@ namespace cPanelBackup
         /// </summary>
         protected NotifyIcon m_icon = null;
 
+        private int _selectedDomain = 0;
+
         #region " Get/set text methods (invoked) "
 
         delegate void SetTextDelegate(string name, string value);
@@ -87,6 +89,13 @@ namespace cPanelBackup
             }
         }
 
+        public int SetSelectedServer
+        {
+            get { return this.lstDomains.SelectedIndex; }
+
+            private set { this._selectedDomain = value; }
+        }
+
         /// <summary>
         /// Thread safe SetText
         /// </summary>
@@ -138,12 +147,20 @@ namespace cPanelBackup
                 // In case we need only one instance of program
                 EnsureSingleApplication();
 
-                this.Text = Settings.NameVersion;
+                //this.Text = Settings.NameVersion;
 
                 // Creates icons using emebedded icon
-                CreateFormIcons();
+                //TODO: Error loading application!
+                //CreateFormIcons();
 
-                lstDomains.Items.AddRange(Backup.DomainsList);
+                string[,] loginData = new string[,] { };
+                loginData = Backup.InitializeLoginData();
+
+                for (var i = 0; i < loginData.GetLength(0); i++)
+                {
+                    lstDomains.Items.Add(loginData[i, 0].ToString());
+                }
+                //lstDomains.Items.AddRange(Backup.DomainsList);
 
                 // Create context menu for tray icon
                 //MenuItem[] arMenu = this.CreateMenuItems();
@@ -244,8 +261,14 @@ namespace cPanelBackup
         /// </summary>
         private void DoBackupWork(object sender, DoWorkEventArgs e)
         {
-            Backup b = new Backup();
-            string postData = "dest=ftp&email_radio=1&email=" + b.Email + "&server=" + b.FtpHost + "&user=" + b.FtpUser + "&pass=" + b.FtpPass + "&port=" + b.FtpPort + "&rdir=" + b.FtpDir;
+            int selectedServer = 0;
+            selectedServer = selectedServer;
+
+            Backup backup = new Backup();
+            backup.InitializeFtpData("ftp.prado.lt", "c0_ia_backup", "ohQ0ErbnfzGY", 21);
+            string postData = "dest=ftp&email_radio=1&email=info@prado.lt&server=" + backup.FtpHost + "&user=" + backup.FtpUser + "&pass=" + backup.FtpPass + "&port=" + backup.FtpPort;
+            backup.sendPostRequest(backup.Domain, 2082, postData, selectedServer);
+            
             Log4cs.Log("Doing backup: {0}", postData);
             Debug("Going to send backup request");
             Thread.Sleep(10000);

@@ -15,53 +15,26 @@ namespace cPanelBackup
 {
     class Backup
     {
+        public string Domain { get; private set; }
+        public string Username { get; private set; }
+        public string Password { get; private set; }
+        public string Email { get; private set; }
+        public string PostLoginUri { get; private set; }
+        public static string[] getDomainList { get; private set; }
+        public string Cookie { get; private set; }
+        public string FtpHost { get; private set; }
+        public string FtpUser { get; private set; }
+        public string FtpPass { get; private set; }
+        public string FtpDir { get; private set; }
+        public string LoginUri { get; private set; }
+        public static string[,] ServerList { get; private set; }
 
-        private string _domain = "";
-        private string _email = "";
-
-        private string _ftpHost = "";
         private int _ftpPort = 21;
-        private string _ftpDir = "";
 
-        private string _loginUri;
-        private string post_login_uri;
-
+//      
         static List<string> _domainsList = null;
 
-        string cookieHeader;
-
-        public string Domain()
-        {
-            return this._domain;
-        }
-
-        public string Username { get; set; }
-
-        public string Password { get; set; }
-
-        public string Email
-        {
-            get
-            {
-                return _email;
-            }
-            set
-            {
-                _email = value;
-            }
-        }
-
-        public string getPostLoginUri()
-        {
-            return this.post_login_uri;
-        }
-
-        public void setPostLoginUri(string post_login)
-        {
-            this.post_login_uri = post_login;
-        }
-
-        public static string[] DomainsList
+        /*public static string[] DomainsList
         {
             get
             {
@@ -80,33 +53,7 @@ namespace cPanelBackup
                 }
                 return _domainsList.ToArray();
             }
-        }
-
-        public string getCookie()
-        {
-            return this.cookieHeader;
-        }
-
-        public void setCookie(string cookieHeader)
-        {
-            this.cookieHeader = cookieHeader;
-        }
-
-        public string FtpHost
-        {
-            get
-            {
-                return _ftpHost;
-            }
-            set
-            {
-                _ftpHost = value;
-            }
-        }
-
-        public string FtpUser { get; set; }
-
-        public string FtpPass { get; set; }
+        }*/
 
         /// <summary>
         /// Gets/sets port for FTP backup sending. Throws ArgumentOutOfRangeException on bad port!
@@ -127,16 +74,25 @@ namespace cPanelBackup
             }
         }
 
-        public string FtpDir
+        public static string[,] InitializeLoginData()
         {
-            get
-            {
-                return _ftpDir;
-            }
-            set
-            {
-                _ftpDir = value;
-            }
+            string[,] loginData = new string[,]
+                                    {
+                                        { "server", "login", "pass", "ftp_dir" }
+                                        , { "server", "login", "pass", "ftp_dir" }
+                                    };
+            ServerList = loginData;
+
+            return loginData;
+        }
+
+        public void InitializeFtpData(string ftpHost, string ftpUser, string ftpPass, int ftpPort)
+        {
+            this.FtpHost = ftpHost;
+            this.FtpUser = ftpUser;
+            this.FtpPass = ftpPass;
+            this.FtpPort = ftpPort;
+
         }
 
         public void sendPostRequest(string uri)
@@ -144,45 +100,60 @@ namespace cPanelBackup
             sendPostRequest(uri, 80, "");
         }
 
-        public void sendPostRequest(string uri, int port, string postData)
+        public void sendPostRequest(string uri, int port = 80, string postData = "", int server = 0)
         {
             try
             {
-                string result = "";
-                _loginUri = String.Format("http://{0}:{1}/frontend/x3/backup/dofullbackup.html", uri, port);
-                Log4cs.Log("Sending backup request: {0}", _loginUri);
-                MessageBox.Show(_loginUri);
-                var cookies = new CookieContainer();
-                var request = (HttpWebRequest)WebRequest.Create(_loginUri);
-                request.CookieContainer = cookies;
-                request.Method = "POST";
-                request.ContentType = "application/x-www-form-urlencoded";
-                request.AllowAutoRedirect = false;
-
-                string authInfo = String.Format("{0}:{1}", Username, Password);
-                authInfo = Convert.ToBase64String(Encoding.Default.GetBytes(authInfo));
-                request.Headers["Authorization"] = "Basic " + authInfo;
-
-                using(var requestStream = request.GetRequestStream())
-                using(var writer = new StreamWriter(requestStream))
+                if (server == -1)
                 {
-                    writer.Write(postData);
+                    MessageBox.Show("Error: Please select server!");
                 }
-
-                using(var responseStream = request.GetResponse().GetResponseStream())
-                using(var reader = new StreamReader(responseStream))
+                else
                 {
-                    result = reader.ReadToEnd();
-                    int start = result.IndexOf("<h1>Full Backup");
-                    int end = result.IndexOf("</h1>");
+                    Domain = "domain.com";
+                    string[,] serverData = ServerList;
+                    Username = serverData[server, 1];
+                    Password = serverData[server, 2];
+                    FtpDir = serverData[server, 3];
+                    postData += "&rdir=" + FtpDir;
 
-                    // save needed string
-                    MessageBox.Show(result.Substring(start + 4, end - start - 4));
+                    if (uri == null)
+                    {
+                        uri = Domain;
+                    }
+                    LoginUri = "http://" + uri + ":" + port + "/frontend/x3/backup/dofullbackup.html";
+
+                    var cookies = new CookieContainer();
+                    var request = (HttpWebRequest)WebRequest.Create(LoginUri);
+                    request.CookieContainer = cookies;
+                    request.Method = "POST";
+                    request.ContentType = "application/x-www-form-urlencoded";
+                    request.AllowAutoRedirect = false;
+
+                    string authInfo = Username + ":" + Password;
+                    authInfo = Convert.ToBase64String(Encoding.Default.GetBytes(authInfo));
+                    request.Headers["Authorization"] = "Basic " + authInfo;
+
+                    using (var requestStream = request.GetRequestStream())
+                    using (var writer = new StreamWriter(requestStream))
+                    {
+                        writer.Write(postData);
+                    }
+
+                    using (var responseStream = request.GetResponse().GetResponseStream())
+                    using (var reader = new StreamReader(responseStream))
+                    {
+                        string result = reader.ReadToEnd();
+                        int start = result.IndexOf("<h1>Full Backup");
+                        int end = result.IndexOf("</h1>");
+
+                        // save needed string
+                        MessageBox.Show(result.Substring(start + 4, end - start - 4));
+                    }
                 }
-            } catch(Exception ex)
+            }
+            catch (Exception ex)
             {
-                Log4cs.Log(Importance.Error, "Error sending backup request!");
-                Log4cs.Log(Importance.Debug, ex.ToString());
                 MessageBox.Show(ex.ToString());
             }
         }
