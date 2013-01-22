@@ -104,6 +104,7 @@ namespace cPanelBackup
         {
             try
             {
+                MessageBox.Show(server.ToString());
                 if (server == -1)
                 {
                     MessageBox.Show("Error: Please select server!");

@@ -17,14 +17,14 @@ namespace cPanelBackup
         /// Systray icon
         /// </summary>
         protected NotifyIcon m_icon = null;
-
-        private int _selectedDomain = 0;
+        public int SelectedServer { get; private set; }
 
         #region " Get/set text methods (invoked) "
 
         delegate void SetTextDelegate(string name, string value);
         delegate string GetTextDelegate(string name);
-
+        delegate int GetSelectedItemDelegate(string name);
+        
         /// <summary>
         /// Returns text of control.
         /// </summary>
@@ -60,6 +60,32 @@ namespace cPanelBackup
             return s;
         }
 
+        private int GetSelectedItem(string name)
+        {
+            int index = -1;
+            try
+            {
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(new GetSelectedItemDelegate(GetSelectedItem), name);
+                }
+                else
+                {
+                    Control[] ar = this.Controls.Find(name, false);
+                    if ((ar != null) && (ar.Length > 0))
+                    {
+                        index = ((ComboBox) ar[0]).SelectedIndex;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+            }
+
+            return index;
+        }
+
+
         /// <summary>
         /// Thread safe AddText
         /// </summary>
@@ -81,6 +107,7 @@ namespace cPanelBackup
                         if(ar[0].GetType() == typeof(TextBox))
                         {
                             ((TextBox)ar[0]).SelectionStart = Int32.MaxValue;
+                            ((TextBox)ar[0]).ScrollToCaret();
                         }
                     }
                 }
@@ -89,12 +116,7 @@ namespace cPanelBackup
             }
         }
 
-        public int SetSelectedServer
-        {
-            get { return this.lstDomains.SelectedIndex; }
-
-            private set { this._selectedDomain = value; }
-        }
+        
 
         /// <summary>
         /// Thread safe SetText
@@ -147,11 +169,10 @@ namespace cPanelBackup
                 // In case we need only one instance of program
                 EnsureSingleApplication();
 
-                //this.Text = Settings.NameVersion;
+                this.Text = Settings.NameVersion;
 
                 // Creates icons using emebedded icon
-                //TODO: Error loading application!
-                //CreateFormIcons();
+                CreateFormIcons();
 
                 string[,] loginData = new string[,] { };
                 loginData = Backup.InitializeLoginData();
@@ -253,7 +274,7 @@ namespace cPanelBackup
         Thread _backupThread = null;
         private void OnBackupButtonClicked(object sender, EventArgs e)
         {
-            backgroundWorker1.RunWorkerAsync(lstDomains.SelectedItem);
+            backgroundWorker1.RunWorkerAsync(SelectedServer = GetSelectedItem("lstDomains"));
         }
 
         /// <summary>
@@ -262,11 +283,11 @@ namespace cPanelBackup
         private void DoBackupWork(object sender, DoWorkEventArgs e)
         {
             int selectedServer = 0;
-            selectedServer = selectedServer;
-
+            selectedServer = SelectedServer;
+            
             Backup backup = new Backup();
-            backup.InitializeFtpData("ftp.prado.lt", "c0_ia_backup", "ohQ0ErbnfzGY", 21);
-            string postData = "dest=ftp&email_radio=1&email=info@prado.lt&server=" + backup.FtpHost + "&user=" + backup.FtpUser + "&pass=" + backup.FtpPass + "&port=" + backup.FtpPort;
+            backup.InitializeFtpData("ftp.domain.com", "ftp_login", "ftp_pass", 21);
+            string postData = "dest=ftp&email_radio=1&email=info@domain.com&server=" + backup.FtpHost + "&user=" + backup.FtpUser + "&pass=" + backup.FtpPass + "&port=" + backup.FtpPort;
             backup.sendPostRequest(backup.Domain, 2082, postData, selectedServer);
             
             Log4cs.Log("Doing backup: {0}", postData);
@@ -308,8 +329,9 @@ namespace cPanelBackup
             sb.AppendFormat(msg, args);
             sb.AppendLine();
             this.AddText("txtOutput", sb.ToString());
-            txtOutput.SelectionStart = int.MaxValue;
-            txtOutput.ScrollToCaret();
+            //txtOutput.SelectionStart = int.MaxValue;
+            this.AddText("txtOutput", int.MaxValue.ToString());
+            //txtOutput.ScrollToCaret();
         }
 
         #endregion
